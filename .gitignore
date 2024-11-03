@@ -1,0 +1,9 @@
+**checkpoints
+**logs
+**venv
+**weights
+**test**
+**_pycache_**
+**.zip**
+**runs
+**.pth
