@@ -7,3 +7,7 @@
 **.zip**
 **runs
 **.pth
+**.DS_Store**
+**venv**
+**.bin**
+**.gz**

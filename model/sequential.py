@@ -50,12 +50,4 @@ class SeqNetwork(nn.Module):
         for l in range(0, self.num_layers - 1):
             lin = getattr(self, "lin" + str(l))
 
-            if l in self.skip_in:
-                x = torch.cat([x, inputs], 1) / np.sqrt(2)
-
-            x = lin(x)
-
-            if l < self.num_layers - 2:
-                x = self.activation(x)
-        bert_feature = x # Shape: (batch_size, feature_size)
         return bert_feature
