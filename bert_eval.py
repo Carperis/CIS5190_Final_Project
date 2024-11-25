@@ -15,7 +15,8 @@ def predict_sentiment(text, model, tokenizer, device, max_length=128):
             
     return "fox" if preds.item() == 1 else "nbc"
 
-data_file = "./data/data.csv"
+# data_file = "./data/data.csv"
+data_file = "./data/data20000.csv"
 texts, labels = load_news_data(data_file)
 
 bert_model_name = 'bert-base-uncased'
@@ -37,5 +38,5 @@ if checkpoint is not None:
     print(f"Loaded model from {checkpoint}")
 
 accuracy, report = evaluate(model, train_dataloader, device)
-print(f"Validation Accuracy: {accuracy:.4f}")
+print(f"Full Accuracy: {accuracy:.4f}")
 print(report)
