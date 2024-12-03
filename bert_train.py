@@ -1,5 +1,6 @@
 import os
 import torch
+import glob
 from torch import nn
 from tqdm import tqdm
 from torch.optim import Adam
@@ -26,6 +27,12 @@ def train(model, data_loader, optimizer, scheduler, device):
         total_loss += loss.item()
         progress_bar.set_postfix(loss=total_loss / len(progress_bar))
 
+def clean_previous_checkpoints(checkpoint_dir, keep_num):
+    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, "*.pth"))
+    if len(checkpoint_files) > keep_num:
+        checkpoint_files = sorted(checkpoint_files, key=os.path.getctime)
+        for checkpoint_file in checkpoint_files[:-keep_num]:
+            os.remove(checkpoint_file)
 
 bert_model_name = "bert-base-uncased"
 num_classes = 2
@@ -34,7 +41,8 @@ batch_size = 16
 num_epochs = 100
 learning_rate = 2e-5
 
-data_file = "./data/data.csv"
+# data_file = "./data/data.csv"
+data_file = "./data/data20000.csv"
 texts, labels = load_news_data(data_file)
 train_texts, val_texts, train_labels, val_labels = train_test_split(
     texts, labels, test_size=0.2, random_state=42
@@ -69,6 +77,7 @@ scheduler = get_linear_schedule_with_warmup(
 )
 
 while epoch < num_epochs:
+    clean_previous_checkpoints(checkpoint_dir, 3)
     print(f"Epoch {epoch + 1}/{num_epochs}")
     train(model, train_dataloader, optimizer, scheduler, device)
     accuracy, report = evaluate(model, val_dataloader, device)
