@@ -1,0 +1,23 @@
+Naive Bayes Text Classification with Pre-trained Model
+This project demonstrates how to use a pre-trained Naive Bayes model and vectorizer for text classification. It includes data preprocessing, text vectorization, and evaluation of the model's accuracy on a given dataset.
+
+Prerequisites
+Make sure you have the following installed:
+
+Python 3.7 or later
+Required Python libraries:
+pandas
+nltk
+scikit-learn
+joblib
+To install the necessary libraries, run: pip install pandas scikit-learn nltk joblib
+
+The input data should be a CSV file (data.csv) located in the ./data directory. The file must include the following columns:
+
+title: The text data to classify.
+news: The target label, where fox will be encoded as 1 and all other values as 0.
+
+Place your dataset in a CSV file named data.csv under the ./data directory.
+Ensure it has the required columns (title and news).
+
+open the jupyternotebook and run the Prediction section in beginning, the model will predict and compare the result with true answer, and accuracy score is printed.
