@@ -1,4 +1,4 @@
-**checkpoints
+**checkpoints**
 **logs
 **venv
 **weights
@@ -7,3 +7,10 @@
 **.zip**
 **runs
 **.pth
+**.DS_Store**
+**venv**
+**.bin**
+**.gz**
+**huggingface_sync.ipynb
+**Carperis**
+**CISProject**
