@@ -1,3 +1,5 @@
+# reference: https://medium.com/@khang.pham.exxact/text-classification-with-bert-7afaacc5e49b
+
 import torch
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer

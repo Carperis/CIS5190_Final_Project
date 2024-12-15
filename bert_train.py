@@ -1,3 +1,5 @@
+# reference: https://medium.com/@khang.pham.exxact/text-classification-with-bert-7afaacc5e49b
+
 import os
 import torch
 import glob
@@ -8,13 +10,13 @@ from torch.utils.data import DataLoader
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from sklearn.model_selection import train_test_split
 from bert_model import TextClassificationDataset, BERTClassifier, get_device, load_news_data, get_latest_checkpoint, evaluate
+from torch.utils.tensorboard import SummaryWriter
 
-
-def train(model, data_loader, optimizer, scheduler, device):
+def train(model, data_loader, optimizer, scheduler, device, writer, epoch):
     model.train()
     total_loss = 0
     progress_bar = tqdm(data_loader, desc="Training")
-    for batch in progress_bar:
+    for step, batch in enumerate(progress_bar):
         optimizer.zero_grad()
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
@@ -25,7 +27,8 @@ def train(model, data_loader, optimizer, scheduler, device):
         optimizer.step()
         scheduler.step()
         total_loss += loss.item()
-        progress_bar.set_postfix(loss=total_loss / len(progress_bar))
+        progress_bar.set_postfix(loss=total_loss / (step + 1))
+        writer.add_scalar('Training Loss', loss.item(), epoch * len(data_loader) + step)
 
 def clean_previous_checkpoints(checkpoint_dir, keep_num):
     checkpoint_files = glob.glob(os.path.join(checkpoint_dir, "*.pth"))
@@ -56,7 +59,6 @@ val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 
 device = get_device()
 model = BERTClassifier(bert_model_name, num_classes).to(device)
-epoch = 0
 
 checkpoint_dir = "bert_checkpoints/"
 if not os.path.exists(checkpoint_dir):
@@ -68,7 +70,9 @@ if checkpoint is not None:
     print(f"Loaded model from {checkpoint}")
 else:
     print("No checkpoint found, training from scratch")
+    epoch = 0
 
+writer = SummaryWriter(log_dir="runs/bert_training")
 
 optimizer = Adam(model.parameters(), lr=learning_rate)
 total_steps = len(train_dataloader) * num_epochs
@@ -79,9 +83,12 @@ scheduler = get_linear_schedule_with_warmup(
 while epoch < num_epochs:
     clean_previous_checkpoints(checkpoint_dir, 3)
     print(f"Epoch {epoch + 1}/{num_epochs}")
-    train(model, train_dataloader, optimizer, scheduler, device)
+    train(model, train_dataloader, optimizer, scheduler, device, writer, epoch)
     accuracy, report = evaluate(model, val_dataloader, device)
     print(f"Validation Accuracy: {accuracy:.4f}")
     print(report)
+    writer.add_scalar('Validation Accuracy', accuracy, epoch)
     torch.save(model.state_dict(), f"{checkpoint_dir}/bert_classifier_epoch_{epoch+1}.pth")
     epoch += 1
+
+writer.close()
