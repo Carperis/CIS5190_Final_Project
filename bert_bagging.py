@@ -8,12 +8,14 @@ from sklearn.model_selection import train_test_split
 from torch.optim import Adam
 from torch import nn
 from tqdm import tqdm
-from bert_model import TextClassificationDataset, BERTClassifier, get_device, load_news_data, evaluate
+from bert_model import TextClassificationDataset, BERTClassifier, get_device, load_news_data
 from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import accuracy_score, classification_report
 
 def train_ensemble(models, train_dataloaders, optimizers, schedulers, device, writer, epoch):
     for model in models:
         model.train()
+    avg_loss = 0
     for dataloader, model, optimizer, scheduler in zip(train_dataloaders, models, optimizers, schedulers):
         total_loss = 0
         progress_bar = tqdm(dataloader, desc="Training")
@@ -30,20 +32,38 @@ def train_ensemble(models, train_dataloaders, optimizers, schedulers, device, wr
             total_loss += loss.item()
             progress_bar.set_postfix(loss=total_loss / (step + 1))
             writer.add_scalar(f'Training Loss/Model_{models.index(model)}', loss.item(), epoch * len(dataloader) + step)
+        avg_loss += total_loss / len(dataloader)
+    return avg_loss / len(models)
 
-def predict_ensemble(models, dataloader, device):
+def evaluate_ensemble(models, dataloader, device):
     for model in models:
         model.eval()
     all_predictions = []
+    actual_labels = []
+    total_loss = 0
     with torch.no_grad():
         for batch in dataloader:
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
+            labels = batch["label"].to(device)
             outputs = [model(input_ids=input_ids, attention_mask=attention_mask) for model in models]
-            avg_output = torch.mean(torch.stack(outputs), dim=0)
-            _, preds = torch.max(avg_output, dim=1)
-            all_predictions.extend(preds.cpu().tolist())
-    return all_predictions
+            
+            # Average ensemble outputs
+            avg_outputs = torch.mean(torch.stack(outputs), dim=0)
+            loss = nn.CrossEntropyLoss()(avg_outputs, labels)
+            total_loss += loss.item()
+            _, avg_preds = torch.max(avg_outputs, dim=1)
+            
+            # Majority voting ensemble outputs
+            majority_preds = torch.mode(torch.stack([torch.max(output, dim=1)[1] for output in outputs]), dim=0)[0]
+            
+            all_predictions.extend(majority_preds.cpu().tolist())
+            actual_labels.extend(labels.cpu().tolist())
+    
+    avg_loss = total_loss / len(dataloader)
+    accuracy = accuracy_score(actual_labels, all_predictions)
+    report = classification_report(actual_labels, all_predictions)
+    return avg_loss, accuracy, report
 
 def get_latest_checkpoints(checkpoint_dir, num_models):
     latest_checkpoints = []
@@ -102,17 +122,20 @@ else:
     print("No checkpoint found, training from scratch")
     epoch = 0
 
-writer = SummaryWriter(log_dir=f"runs/bert_{num_models}bagging")
+from datetime import datetime
+now = datetime.now()
+writer = SummaryWriter(log_dir=f"runs/bert_{num_models}bagging_training_{now.strftime('%Y%m%d%H%M%S')}")
 
 while epoch < num_epochs:
     clean_previous_checkpoints(checkpoint_dir, num_models, 3)
     print(f"Epoch {epoch + 1}/{num_epochs}")
-    train_ensemble(models, train_dataloaders, optimizers, schedulers, device, writer, epoch)
-    val_predictions = predict_ensemble(models, val_dataloader, device)
-    accuracy, report = evaluate(models[0], val_dataloader, device)  # Using one model for evaluation
-    print(f"Validation Accuracy: {accuracy:.4f}")
+    train_loss = train_ensemble(models, train_dataloaders, optimizers, schedulers, device, writer, epoch)
+    val_loss, accuracy, report = evaluate_ensemble(models, val_dataloader, device)
+    print(f"Validation Accuracy: {accuracy:.4f}, Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}")
     print(report)
+    writer.add_scalar("Train Epoch Loss", train_loss, epoch)
     writer.add_scalar('Validation Accuracy', accuracy, epoch)
+    writer.add_scalar('Validation Loss', val_loss, epoch)
     for i, model in enumerate(models):
         torch.save(model.state_dict(), f"{checkpoint_dir}/bert_classifier_model_{i}_epoch_{epoch+1}.pth")
     epoch += 1

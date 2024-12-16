@@ -29,6 +29,7 @@ def train(model, data_loader, optimizer, scheduler, device, writer, epoch):
         total_loss += loss.item()
         progress_bar.set_postfix(loss=total_loss / (step + 1))
         writer.add_scalar('Training Loss', loss.item(), epoch * len(data_loader) + step)
+    return total_loss / len(data_loader)
 
 def clean_previous_checkpoints(checkpoint_dir, keep_num):
     checkpoint_files = glob.glob(os.path.join(checkpoint_dir, "*.pth"))
@@ -41,7 +42,7 @@ bert_model_name = "bert-base-uncased"
 num_classes = 2
 max_length = 32
 batch_size = 16
-num_epochs = 100
+num_epochs = 20
 learning_rate = 2e-5
 
 # data_file = "./data/data.csv"
@@ -72,7 +73,9 @@ else:
     print("No checkpoint found, training from scratch")
     epoch = 0
 
-writer = SummaryWriter(log_dir="runs/bert_training")
+from datetime import datetime
+now = datetime.now()
+writer = SummaryWriter(log_dir=f"runs/bert_training_{now.strftime('%Y%m%d%H%M%S')}")
 
 optimizer = Adam(model.parameters(), lr=learning_rate)
 total_steps = len(train_dataloader) * num_epochs
@@ -80,14 +83,17 @@ scheduler = get_linear_schedule_with_warmup(
     optimizer, num_warmup_steps=0, num_training_steps=total_steps
 )
 
+print(f"Using device: {device}")
 while epoch < num_epochs:
     clean_previous_checkpoints(checkpoint_dir, 3)
     print(f"Epoch {epoch + 1}/{num_epochs}")
-    train(model, train_dataloader, optimizer, scheduler, device, writer, epoch)
-    accuracy, report = evaluate(model, val_dataloader, device)
-    print(f"Validation Accuracy: {accuracy:.4f}")
+    train_loss = train(model, train_dataloader, optimizer, scheduler, device, writer, epoch)
+    val_loss, accuracy, report = evaluate(model, val_dataloader, device)
+    print(f"Validation Accuracy: {accuracy:.4f}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
     print(report)
-    writer.add_scalar('Validation Accuracy', accuracy, epoch)
+    writer.add_scalar("Training Epoch Loss", train_loss, epoch)
+    writer.add_scalar("Validation Epoch Loss", val_loss, epoch)
+    writer.add_scalar("Validation Accuracy", accuracy, epoch)
     torch.save(model.state_dict(), f"{checkpoint_dir}/bert_classifier_epoch_{epoch+1}.pth")
     epoch += 1
 

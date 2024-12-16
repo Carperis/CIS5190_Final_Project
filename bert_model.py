@@ -78,15 +78,19 @@ def evaluate(model, data_loader, device):
     model.eval()
     predictions = []
     actual_labels = []
+    total_loss = 0
     with torch.no_grad():
         for batch in data_loader:
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             labels = batch["label"].to(device)
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            loss = nn.CrossEntropyLoss()(outputs, labels)
+            total_loss += loss.item()
             _, preds = torch.max(outputs, dim=1)
             predictions.extend(preds.cpu().tolist())
             actual_labels.extend(labels.cpu().tolist())
-    return accuracy_score(actual_labels, predictions), classification_report(
+    avg_loss = total_loss / len(data_loader)
+    return avg_loss, accuracy_score(actual_labels, predictions), classification_report(
         actual_labels, predictions
     )
